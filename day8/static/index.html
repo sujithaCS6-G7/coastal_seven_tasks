@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Day 8: High-Performance Async, Redis Caching & Celery Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131c2e;
+      --border: #223049;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --accent: #a855f7;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 20px 28px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .header-title h1 { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+    .header-title p { font-size: 0.875rem; color: var(--text-muted); margin-top: 4px; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #090d16;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-secondary:hover { background: #334155; }
+    .btn-danger { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .btn-danger:hover { background: var(--danger); color: white; }
+    .btn-accent { background: var(--accent); color: white; }
+
+    .code-box {
+      background: #060911;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .metric-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-cache { background: #064e3b; color: #34d399; }
+    .badge-db { background: #78350f; color: #fcd34d; }
+    .badge-429 { background: #7f1d1d; color: #fca5a5; }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 12px;
+      background: #060911;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transition: width 0.4s ease;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-title">
+        <h1>Day 8: Async Programming, Redis Caching & Celery</h1>
+        <p>Interactive Benchmark, Sliding-Window Limiter & Distributed Task Monitor</p>
+      </div>
+      <div class="status-pill" id="redisStatus">● Redis Connected</div>
+    </header>
+
+    <!-- SECTION 1: Async Benchmark & Caching -->
+    <div class="grid-2">
+      <!-- Async Benchmark -->
+      <div class="card">
+        <h2>
+          <span>1. Async Concurrency Benchmark</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">asyncio.gather() vs Sequential</span>
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Simulates 3 microservice queries (Product 300ms, Stock 300ms, Reviews 300ms).
+        </p>
+        <div style="display: flex; gap: 10px;">
+          <button id="btnRunSequential" class="btn btn-secondary">Sequential (~900ms)</button>
+          <button id="btnRunConcurrent" class="btn btn-primary">asyncio.gather() (~300ms)</button>
+        </div>
+        <div id="asyncResult" class="code-box">Click a button above to compare execution times...</div>
+      </div>
+
+      <!-- Redis Cache-Aside & TTL -->
+      <div class="card">
+        <h2>
+          <span>2. Redis Cache-Aside & TTL</span>
+          <span id="cacheBadge" class="metric-badge badge-db">No query yet</span>
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          1st fetch hits database (~200ms latency). Subsequent fetches hit Redis cache (&lt;2ms).
+        </p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button id="btnFetchProducts" class="btn btn-primary">Fetch Products</button>
+          <button id="btnInvalidateCache" class="btn btn-danger">Invalidate Cache</button>
+        </div>
+        <div id="cacheResult" class="code-box">Awaiting product query...</div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Rate Limiter & Celery Background Tasks -->
+    <div class="grid-2">
+      <!-- Sliding-Window Rate Limiting -->
+      <div class="card">
+        <h2>
+          <span>3. Redis Sliding-Window Rate Limiter</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">5 requests / 60s window</span>
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Uses Redis Sorted Sets (ZSET) to record exact microsecond timestamps.
+        </p>
+        <div style="display: flex; gap: 10px;">
+          <button id="btnSendRequest" class="btn btn-primary">Send 1 Request</button>
+          <button id="btnSpamRequests" class="btn btn-secondary">Burst 6 Requests</button>
+        </div>
+        <div id="rateLimitResult" class="code-box">Send requests to test sliding-window limiter...</div>
+      </div>
+
+      <!-- Celery Distributed Tasks vs FastAPI BackgroundTasks -->
+      <div class="card">
+        <h2>
+          <span>4. Celery vs BackgroundTasks</span>
+          <span id="taskStatusBadge" style="font-size: 0.75rem; color: var(--accent);">IDLE</span>
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Trigger out-of-process distributed worker with live progress tracking or in-process BackgroundTask.
+        </p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button id="btnStartCelery" class="btn btn-accent">Start Celery Report (5s)</button>
+          <button id="btnFastapiTask" class="btn btn-secondary">FastAPI BackgroundTask</button>
+        </div>
+        <div class="progress-bar-container">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="celeryResult" class="code-box">No Celery tasks queued yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 1. Async Benchmark
+    document.getElementById("btnRunSequential").addEventListener("click", async () => {
+      const box = document.getElementById("asyncResult");
+      box.textContent = "Running sequential simulation (waiting ~900ms)...";
+      const start = performance.now();
+      // Sequential simulation
+      await new Promise(r => setTimeout(r, 900));
+      const clientDuration = (performance.now() - start).toFixed(0);
+      box.textContent = JSON.stringify({
+        execution_mode: "sequential",
+        total_elapsed_seconds: (clientDuration / 1000).toFixed(3),
+        explanation: "Sequential execution blocks on each I/O call: 300ms + 300ms + 300ms = 900ms.",
+        round_trip_ms: clientDuration + "ms"
+      }, null, 2);
+    });
+
+    document.getElementById("btnRunConcurrent").addEventListener("click", async () => {
+      const box = document.getElementById("asyncResult");
+      box.textContent = "Calling GET /analytics/product-summary/1 (asyncio.gather)...";
+      const start = performance.now();
+      const res = await fetch("/analytics/product-summary/1");
+      const data = await res.json();
+      const clientDuration = (performance.now() - start).toFixed(0);
+      box.textContent = JSON.stringify({ ...data, round_trip_ms: clientDuration + "ms" }, null, 2);
+    });
+
+    // 2. Redis Cache-Aside
+    document.getElementById("btnFetchProducts").addEventListener("click", async () => {
+      const box = document.getElementById("cacheResult");
+      const badge = document.getElementById("cacheBadge");
+      box.textContent = "Fetching /products...";
+      const start = performance.now();
+      const res = await fetch("/products");
+      const data = await res.json();
+      const duration = (performance.now() - start).toFixed(1);
+
+      if (data.source === "cache") {
+        badge.className = "metric-badge badge-cache";
+        badge.textContent = `⚡ HIT CACHE (${duration}ms | TTL: ${data.ttl_remaining}s)`;
+      } else {
+        badge.className = "metric-badge badge-db";
+        badge.textContent = `🐢 MISS DB (${duration}ms)`;
+      }
+      box.textContent = JSON.stringify(data, null, 2);
+    });
+
+    document.getElementById("btnInvalidateCache").addEventListener("click", async () => {
+      const res = await fetch("/api/v1/products/cache", { method: "DELETE" });
+      const data = await res.json();
+      document.getElementById("cacheBadge").className = "metric-badge badge-db";
+      document.getElementById("cacheBadge").textContent = "Cache Purged";
+      document.getElementById("cacheResult").textContent = JSON.stringify(data, null, 2);
+    });
+
+    // 3. Sliding Window Rate Limiting
+    async function fireRateLimitedRequest() {
+      const res = await fetch("/products");
+      const status = res.status;
+      const data = await res.json();
+      return { status, data };
+    }
+
+    document.getElementById("btnSendRequest").addEventListener("click", async () => {
+      const box = document.getElementById("rateLimitResult");
+      const res = await fireRateLimitedRequest();
+      box.textContent = `Status: ${res.status}\n` + JSON.stringify(res.data, null, 2);
+    });
+
+    document.getElementById("btnSpamRequests").addEventListener("click", async () => {
+      const box = document.getElementById("rateLimitResult");
+      box.textContent = "Bursting 6 concurrent requests to /products...";
+      const promises = Array.from({ length: 6 }, () => fireRateLimitedRequest());
+      const results = await Promise.all(promises);
+      const summary = results.map((r, i) => `#${i + 1}: HTTP ${r.status} ${r.status === 429 ? '🚫 RATE LIMITED' : '✅ ALLOWED'}`).join("\n");
+      box.textContent = summary;
+    });
+
+    // 4. Celery vs BackgroundTasks
+    document.getElementById("btnFastapiTask").addEventListener("click", async () => {
+      const box = document.getElementById("celeryResult");
+      const res = await fetch("/jobs/fastapi-background-task", { method: "POST" });
+      const data = await res.json();
+      box.textContent = "FastAPI BackgroundTask (In-process):\n" + JSON.stringify(data, null, 2);
+    });
+
+    let pollInterval = null;
+    document.getElementById("btnStartCelery").addEventListener("click", async () => {
+      const box = document.getElementById("celeryResult");
+      const bar = document.getElementById("progressBar");
+      const badge = document.getElementById("taskStatusBadge");
+      bar.style.width = "0%";
+      badge.textContent = "DISPATCHING...";
+      box.textContent = "Submitting task to POST /jobs/celery-report/101...";
+
+      const res = await fetch("/jobs/celery-report/101", { method: "POST" });
+      const data = await res.json();
+      const taskId = data.task_id;
+      badge.textContent = `RUNNING (${taskId.slice(0, 8)})`;
+
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        const pollRes = await fetch(`/jobs/celery-status/${taskId}`);
+        const pollData = await pollRes.json();
+        const percent = pollData.progress?.percent || (pollData.status === "SUCCESS" ? 100 : 0);
+        bar.style.width = `${percent}%`;
+        badge.textContent = `${pollData.status} (${percent}%)`;
+        box.textContent = JSON.stringify(pollData, null, 2);
+
+        if (pollData.status === "SUCCESS" || pollData.status === "FAILURE") {
+          clearInterval(pollInterval);
+        }
+      }, 800);
+    });
+
+  </script>
+</body>
+</html>
