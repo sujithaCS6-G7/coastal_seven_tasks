@@ -1,0 +1,1061 @@
+{
+	"info": {
+		"_postman_id": "day10-ecommerce-mini-project-api",
+		"name": "Day 10 - E-Commerce Mini Project API",
+		"description": "Production Postman Collection for Day 10 E-Commerce Mini Project covering System Status, Authentication & Users, Products Catalog & Pillow Uploads, Redis Shopping Cart, Orders & Checkout with Stock Verification, and WebSockets.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "productId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "orderId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "tempUser",
+			"value": "customer_auto",
+			"type": "string"
+		},
+		{
+			"key": "tempEmail",
+			"value": "customer_auto@example.com",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. System Status",
+			"item": [
+				{
+					"name": "GET Root Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"System is online and healthy\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.status).to.eql(\"online\");",
+									"    pm.expect(json.database.connected).to.be.true;",
+									"    pm.expect(json.redis.connected).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/",
+							"host": ["{{baseUrl}}"],
+							"path": [""]
+						},
+						"description": "Verify application liveness, PostgreSQL (day10_db) connection status, and Redis cache availability."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Authentication & Users",
+			"item": [
+				{
+					"name": "POST Register User",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"var rand = Math.floor(Math.random() * 900000) + 100000;",
+									"var uName = \"user_\" + rand;",
+									"var uEmail = \"user_\" + rand + \"@example.com\";",
+									"pm.collectionVariables.set(\"tempUser\", uName);",
+									"pm.collectionVariables.set(\"tempEmail\", uEmail);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"pm.test(\"User registered successfully\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property(\"id\");",
+									"    pm.expect(json.username).to.eql(pm.collectionVariables.get(\"tempUser\"));",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"{{tempUser}}\",\n  \"email\": \"{{tempEmail}}\",\n  \"password\": \"Password123!\",\n  \"role\": \"customer\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "register"]
+						},
+						"description": "Register a new user account with hashed password and role assignment."
+					},
+					"response": []
+				},
+				{
+					"name": "POST Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"JWT token received and saved to accessToken\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.access_token).to.be.a(\"string\");",
+									"    pm.collectionVariables.set(\"accessToken\", jsonData.access_token);",
+									"    pm.environment.set(\"accessToken\", jsonData.access_token);",
+									"    console.log(\"Saved accessToken:\", jsonData.access_token);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Authenticate user credentials, receive JWT Bearer token, and automatically save to {{accessToken}} variable."
+					},
+					"response": []
+				},
+				{
+					"name": "GET Current User Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Returns authenticated user profile\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.username).to.eql(\"admin\");",
+									"    pm.expect(json.role).to.eql(\"admin\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Retrieve currently authenticated user profile using Bearer token."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Products & Catalog",
+			"item": [
+				{
+					"name": "GET List Products (Redis Cached)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Product catalog returned with products array\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.products).to.be.an(\"array\");",
+									"    pm.expect(json.total).to.be.a(\"number\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", ""]
+						},
+						"description": "Retrieve product catalog with Redis Cache-Aside acceleration and cache status."
+					},
+					"response": []
+				},
+				{
+					"name": "POST Create Product (Admin Only)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"pm.test(\"Product created and productId variable saved\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.id).to.be.a(\"number\");",
+									"    pm.collectionVariables.set(\"productId\", json.id.toString());",
+									"    pm.environment.set(\"productId\", json.id.toString());",
+									"    console.log(\"Saved productId:\", json.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Postman Mechanical Keyboard\",\n  \"description\": \"Tactile switches with customizable per-key RGB backlighting.\",\n  \"price\": 89.99,\n  \"stock\": 40,\n  \"category\": \"Peripherals\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", ""]
+						},
+						"description": "Create a new catalog product (requires admin Bearer token). Automatically invalidates Redis product cache."
+					},
+					"response": []
+				},
+				{
+					"name": "GET Product by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Product details match productId\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.id.toString()).to.eql(pm.collectionVariables.get(\"productId\"));",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", "{{productId}}"]
+						},
+						"description": "Retrieve single product details by product ID."
+					},
+					"response": []
+				},
+				{
+					"name": "PUT Update Product (Admin Only)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Product updated successfully\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.name).to.include(\"Pro\");",
+									"    pm.expect(json.price).to.eql(99.99);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Postman Mechanical Keyboard Pro\",\n  \"description\": \"Upgraded wireless mechanical keyboard with hot-swappable switches.\",\n  \"price\": 99.99,\n  \"stock\": 35,\n  \"category\": \"Peripherals\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", "{{productId}}"]
+						},
+						"description": "Update product price, description or inventory (requires admin Bearer token)."
+					},
+					"response": []
+				},
+				{
+					"name": "POST Upload Product Image (Admin Only)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Product image_url updated with Pillow processed WebP path\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.image_url).to.be.a(\"string\");",
+									"    pm.expect(json.image_url).to.include(\"/uploads/products/\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "test_image.png"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/image",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", "{{productId}}", "image"]
+						},
+						"description": "Upload and optimize product image with Pillow (validates MIME format, resizes to max 800x800, and converts to WebP)."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE Product (Admin Only)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 204 No Content\", function () {",
+									"    pm.response.to.have.status(204);",
+									"});",
+									"// Reset productId back to catalog product 1 for Cart and Order testing",
+									"pm.collectionVariables.set(\"productId\", \"1\");",
+									"pm.environment.set(\"productId\", \"1\");",
+									"console.log(\"Reset productId to 1 for Cart testing\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", "{{productId}}"]
+						},
+						"description": "Delete a product item from catalog and invalidate cache."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Redis Shopping Cart",
+			"item": [
+				{
+					"name": "GET Current Cart",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Cart object returned with items array\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property(\"items\");",
+									"    pm.expect(json).to.have.property(\"total_price\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cart/",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", ""]
+						},
+						"description": "Retrieve authenticated user's shopping cart stored in Redis with calculated totals."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE Clear Entire Cart",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 204 No Content\", function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cart/",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", ""]
+						},
+						"description": "Completely empty the authenticated user's shopping cart in Redis."
+					},
+					"response": []
+				},
+				{
+					"name": "POST Add Product to Cart",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"pm.test(\"Item added to Redis cart\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.items.length).to.be.above(0);",
+									"    pm.expect(json.total_items).to.be.above(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"product_id\": 1,\n  \"quantity\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/items",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "items"]
+						},
+						"description": "Add product to Redis shopping cart after validating available stock in PostgreSQL."
+					},
+					"response": []
+				},
+				{
+					"name": "PUT Update Cart Item Quantity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Cart item quantity updated\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.total_items).to.be.above(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"quantity\": 3\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/items/{{productId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "items", "{{productId}}"]
+						},
+						"description": "Update quantity of a line item in the shopping cart."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE Remove Item from Cart",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Item removed from cart response valid\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property(\"items\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cart/items/2",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "items", "2"]
+						},
+						"description": "Remove a specific item line from the user's Redis shopping cart."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5. Orders & Checkout",
+			"item": [
+				{
+					"name": "POST Checkout Cart & Place Order",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Ensure cart has an active line item before checking out",
+									"pm.sendRequest({",
+									"    url: pm.collectionVariables.get(\"baseUrl\") + \"/cart/items\",",
+									"    method: \"POST\",",
+									"    header: {",
+									"        \"Content-Type\": \"application/json\",",
+									"        \"Authorization\": \"Bearer \" + pm.collectionVariables.get(\"accessToken\")",
+									"    },",
+									"    body: {",
+									"        mode: \"raw\",",
+									"        raw: JSON.stringify({ product_id: 1, quantity: 1 })",
+									"    }",
+									"}, function (err, res) {",
+									"    console.log(\"Checkout pre-requisite cart item ensured.\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"pm.test(\"Order created and orderId variable saved\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.id).to.be.a(\"number\");",
+									"    pm.expect(jsonData.order_number).to.include(\"ORD-\");",
+									"    pm.collectionVariables.set(\"orderId\", jsonData.id.toString());",
+									"    pm.environment.set(\"orderId\", jsonData.id.toString());",
+									"    console.log(\"Saved orderId:\", jsonData.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"shipping_address\": \"Beach Road, MVP Colony, Visakhapatnam, AP, 530017\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders/checkout",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "checkout"]
+						},
+						"description": "Checkout user's Redis cart: validates stock, atomically deducts inventory in PostgreSQL, empties cart, dispatches Celery confirmation email, and pushes WebSocket event."
+					},
+					"response": []
+				},
+				{
+					"name": "GET List My Orders",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Orders list returned as array with placed orders\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.be.an(\"array\");",
+									"    pm.expect(json.length).to.be.above(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", ""]
+						},
+						"description": "Retrieve all orders placed by the currently authenticated user."
+					},
+					"response": []
+				},
+				{
+					"name": "GET Order Details by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Order details match current orderId\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.id.toString()).to.eql(pm.collectionVariables.get(\"orderId\"));",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "{{orderId}}"]
+						},
+						"description": "Retrieve specific order details (requires owner or admin access)."
+					},
+					"response": []
+				},
+				{
+					"name": "PUT Update Order Status (Admin Only)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Order status successfully updated to SHIPPED\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.status).to.eql(\"SHIPPED\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"SHIPPED\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "{{orderId}}", "status"]
+						},
+						"description": "Update order status (e.g. PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED) and broadcast notification over WebSockets."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6. WebSockets",
+			"item": [
+				{
+					"name": "GET WebSocket Service Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"WebSocket service is online\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.status).to.eql(\"online\");",
+									"    pm.expect(json).to.have.property(\"active_connections\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/ws/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["ws", "status"]
+						},
+						"description": "Retrieve active WebSocket connection count and health status."
+					},
+					"response": []
+				},
+				{
+					"name": "GET Live Order Tracker Dashboard",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Returns Live Tracker HTML Dashboard\", function () {",
+									"    pm.expect(pm.response.text()).to.include(\"Live Order Tracking\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/ws/tracker",
+							"host": ["{{baseUrl}}"],
+							"path": ["ws", "tracker"]
+						},
+						"description": "Interactive visual dashboard to monitor real-time WebSocket order events and Celery email tasks."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
