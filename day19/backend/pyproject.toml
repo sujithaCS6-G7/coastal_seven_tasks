@@ -1,0 +1,35 @@
+[project]
+name = "day10-ecommerce"
+version = "1.0.0"
+description = "Day 10 Mini Project: Full-stack E-Commerce API with PostgreSQL, Redis Cart & Caching, Celery Tasks, WebSockets, and Pytest Suite"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg[binary]>=3.2.0",
+    "redis>=5.0.0",
+    "celery>=5.4.0",
+    "websockets>=13.0",
+    "pillow>=10.4.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+    "python-multipart>=0.0.9",
+    "bcrypt>=4.2.0",
+    "pyjwt>=2.9.0",
+    "python-dotenv>=1.0.1",
+    "email-validator>=2.3.0",
+    "slowapi>=0.1.9",
+    "locust>=2.32.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = [".", "../.packages", "../../day10_ecommerce/.venv/Lib/site-packages"]
+asyncio_mode = "auto"
+addopts = "-v -p no:locust"
