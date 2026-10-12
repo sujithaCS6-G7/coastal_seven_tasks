@@ -1,0 +1,277 @@
+"""Day 20 Free LLM Providers Integration: Groq, Gemini, Mistral & OpenAI-Compatible.
+
+Supports progressive token streaming via Server-Sent Events (SSE), API key isolation,
+strict error classification (RateLimit 429, Timeout, Auth 401), and a deterministic
+local contextual engine for offline operation and zero-dependency testing.
+"""
+
+import asyncio
+import json
+import logging
+from typing import Any, AsyncGenerator, Optional
+import httpx
+
+from app.config import settings
+
+logger = logging.getLogger("nexora.llm")
+
+
+class LLMProviderError(Exception):
+    """Base exception for LLM provider errors."""
+    def __init__(self, provider: str, status_code: Optional[int], message: str):
+        super().__init__(f"[{provider}] HTTP {status_code}: {message}")
+        self.provider = provider
+        self.status_code = status_code
+        self.message = message
+
+
+class RateLimitError(LLMProviderError):
+    """Raised when an LLM provider returns HTTP 429."""
+    pass
+
+
+class LLMManager:
+    """Manages multi-provider LLM integrations with streaming Server-Sent Events."""
+
+    def __init__(self):
+        self.timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
+
+    async def stream_groq(
+        self, messages: list[dict[str, str]], model: Optional[str] = None
+    ) -> AsyncGenerator[str, None]:
+        """Stream tokens from Groq API (free-tier Llama 3.3/3.1)."""
+        api_key = settings.GROQ_API_KEY
+        if not api_key:
+            raise LLMProviderError("groq", 401, "GROQ_API_KEY is not configured.")
+
+        selected_model = model or settings.GROQ_MODEL
+        url = f"{settings.GROQ_BASE_URL.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": selected_model,
+            "messages": messages,
+            "stream": True,
+            "temperature": 0.2,
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code == 429:
+                        raise RateLimitError("groq", 429, "Groq rate limit exceeded.")
+                    if response.status_code != 200:
+                        err_body = await response.aread()
+                        raise LLMProviderError("groq", response.status_code, err_body.decode(errors="replace"))
+
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            if token:
+                                yield token
+                        except json.JSONDecodeError:
+                            continue
+            except httpx.TimeoutException as exc:
+                raise LLMProviderError("groq", 408, f"Groq request timed out: {exc}")
+            except httpx.ConnectError as exc:
+                raise LLMProviderError("groq", 503, f"Failed to connect to Groq: {exc}")
+
+    async def stream_gemini(
+        self, messages: list[dict[str, str]], model: Optional[str] = None
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream tokens from Google Gemini API via official OpenAI-compatible endpoint
+        or native streamGenerateContent.
+        """
+        api_key = settings.GEMINI_API_KEY
+        if not api_key:
+            raise LLMProviderError("gemini", 401, "GEMINI_API_KEY is not configured.")
+
+        selected_model = model or settings.GEMINI_MODEL
+        url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": selected_model,
+            "messages": messages,
+            "stream": True,
+            "temperature": 0.2,
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code == 429:
+                        raise RateLimitError("gemini", 429, "Google Gemini quota/rate limit exceeded.")
+                    if response.status_code != 200:
+                        err_body = await response.aread()
+                        raise LLMProviderError("gemini", response.status_code, err_body.decode(errors="replace"))
+
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            if token:
+                                yield token
+                        except json.JSONDecodeError:
+                            continue
+            except httpx.TimeoutException as exc:
+                raise LLMProviderError("gemini", 408, f"Gemini request timed out: {exc}")
+            except httpx.ConnectError as exc:
+                raise LLMProviderError("gemini", 503, f"Failed to connect to Gemini: {exc}")
+
+    async def stream_mistral(
+        self, messages: list[dict[str, str]], model: Optional[str] = None
+    ) -> AsyncGenerator[str, None]:
+        """Stream tokens from Mistral API."""
+        api_key = settings.MISTRAL_API_KEY
+        if not api_key:
+            raise LLMProviderError("mistral", 401, "MISTRAL_API_KEY is not configured.")
+
+        selected_model = model or settings.MISTRAL_MODEL
+        url = f"{settings.MISTRAL_BASE_URL.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": selected_model,
+            "messages": messages,
+            "stream": True,
+            "temperature": 0.2,
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code == 429:
+                        raise RateLimitError("mistral", 429, "Mistral rate limit exceeded.")
+                    if response.status_code != 200:
+                        err_body = await response.aread()
+                        raise LLMProviderError("mistral", response.status_code, err_body.decode(errors="replace"))
+
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            if token:
+                                yield token
+                        except json.JSONDecodeError:
+                            continue
+            except httpx.TimeoutException as exc:
+                raise LLMProviderError("mistral", 408, f"Mistral request timed out: {exc}")
+            except httpx.ConnectError as exc:
+                raise LLMProviderError("mistral", 503, f"Failed to connect to Mistral: {exc}")
+
+    async def stream_openai_compatible(
+        self, messages: list[dict[str, str]], base_url: Optional[str] = None, model: Optional[str] = None
+    ) -> AsyncGenerator[str, None]:
+        """Stream tokens from any generic OpenAI-compatible endpoint."""
+        api_key = settings.OPENAI_API_KEY
+        url_base = base_url or settings.OPENAI_BASE_URL
+        selected_model = model or settings.OPENAI_MODEL
+        url = f"{url_base.rstrip('/')}/chat/completions"
+
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        payload = {
+            "model": selected_model,
+            "messages": messages,
+            "stream": True,
+            "temperature": 0.2,
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code == 429:
+                        raise RateLimitError("openai_compatible", 429, "Rate limit exceeded.")
+                    if response.status_code != 200:
+                        err_body = await response.aread()
+                        raise LLMProviderError("openai_compatible", response.status_code, err_body.decode(errors="replace"))
+
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            if token:
+                                yield token
+                        except json.JSONDecodeError:
+                            continue
+            except httpx.TimeoutException as exc:
+                raise LLMProviderError("openai_compatible", 408, f"OpenAI-compatible request timed out: {exc}")
+            except httpx.ConnectError as exc:
+                raise LLMProviderError("openai_compatible", 503, f"Failed to connect: {exc}")
+
+    async def stream_local_contextual(
+        self,
+        query: str,
+        retrieved_items: list[dict[str, Any]],
+    ) -> AsyncGenerator[str, None]:
+        """
+        Deterministic, local fallback streamer.
+        Grounded strictly on retrieved catalog items; answers accurately with exact citations
+        or states information is unavailable. Yields tokens with realistic typing intervals.
+        """
+        if not retrieved_items:
+            response_text = (
+                "I cannot find that product or specification in our catalog. "
+                "Currently available items are listed in our store catalog and search results. "
+                "Please let me know if you would like recommendations for other categories!"
+            )
+        else:
+            # Construct grounded, factual response
+            top = retrieved_items[0]
+            items_text = "\n".join(
+                [
+                    f"• [Product #{it['product_id']}: {it['name']} - ${it['price']:.2f}]\n"
+                    f"  Category: {it.get('category', 'General')} | In Stock: {it.get('stock', 0)} units\n"
+                    f"  Details: {it.get('snippet', '')}"
+                    for it in retrieved_items[:3]
+                ]
+            )
+
+            response_text = (
+                f"Based on our Nexora catalog, here are the most relevant products matching your request:\n\n"
+                f"{items_text}\n\n"
+                f"Top Recommendation: [Product #{top['product_id']}: {top['name']} - ${top['price']:.2f}]. "
+                f"It is currently in stock with {top.get('stock', 0)} units ready for immediate checkout."
+            )
+
+        # Break into natural token chunks and stream
+        words = response_text.split(" ")
+        for i, word in enumerate(words):
+            token = word + (" " if i < len(words) - 1 else "")
+            yield token
+            await asyncio.sleep(0.015)
+
+
+# Global singleton instance
+llm_manager = LLMManager()

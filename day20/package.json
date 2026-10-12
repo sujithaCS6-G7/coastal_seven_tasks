@@ -1,0 +1,15 @@
+{
+  "name": "day19-workspace-root",
+  "version": "19.0.0",
+  "private": true,
+  "description": "Root workspace runner forwarding npm scripts to E:\\PYTHON\\day19\\frontend",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "test": "npm --prefix frontend run test",
+    "test:run": "npm --prefix frontend run test:run",
+    "test:e2e": "npm --prefix frontend run test:e2e"
+  }
+}
