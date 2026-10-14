@@ -1,0 +1,7 @@
+name,category,price,stock,description,image_url
+Samsung Galaxy S25 Ultra 5G,Electronics,1299.99,25,200MP Quad Telephoto AI Smartphone with Snapdragon 8 Elite and Titanium Shield,http://127.0.0.1:8003/uploads/products/laptop.jpg
+Apple iPad Pro M4 13-inch OLED,Electronics,1099.00,20,Ultra-thin Tandem OLED display tablet with Apple M4 chip and Apple Pencil Pro support,http://127.0.0.1:8003/uploads/products/monitor.jpg
+Bose QuietComfort Ultra Headphones,Audio,429.00,35,Spatial audio wireless noise-cancelling headphones with CustomTune technology,http://127.0.0.1:8003/uploads/products/headphones.jpg
+Logitech MX Master 3S Wireless Mouse,Accessories,99.99,50,8000 DPI optical sensor ergonomic mouse with quiet clicks and MagSpeed electromagnetic wheel,http://127.0.0.1:8003/uploads/products/broken_404_image.jpg
+ASUS ROG Swift 34-inch Curved OLED,Displays,999.50,10,UWQHD 240Hz G-Sync gaming monitor with ROG smart heatsink,
+Invalid Demo Row (Negative Price),Accessories,-50.00,5,Intentional invalid row with negative price to test Celery row-level error reporting,http://127.0.0.1:8003/uploads/products/keyboard.jpg
