@@ -78,8 +78,8 @@ describe('Day 17 — Full-Stack Integration & Real-Time Features Suite', () => {
 
   describe('1. Environment Configuration & JWT Header Injection', () => {
     it('provides centralized API_BASE_URL, WS_BASE_URL, buildWsUrl, and resolveAssetUrl helpers', () => {
-      expect(['http://localhost:8005', 'http://localhost:8004', 'http://localhost:8003']).toContain(API_BASE_URL);
-      expect(['ws://localhost:8005', 'ws://localhost:8004', 'ws://localhost:8003']).toContain(WS_BASE_URL);
+      expect(['http://localhost:8000', 'http://localhost:8005', 'http://localhost:8004', 'http://localhost:8003']).toContain(API_BASE_URL);
+      expect(['ws://localhost:8000', 'ws://localhost:8005', 'ws://localhost:8004', 'ws://localhost:8003']).toContain(WS_BASE_URL);
       expect(buildWsUrl('/ws/orders/2')).toBe(`${WS_BASE_URL}/ws/orders/2`);
       expect(resolveAssetUrl('/uploads/products/laptop.jpg')).toBe(
         `${API_BASE_URL}/uploads/products/laptop.jpg`

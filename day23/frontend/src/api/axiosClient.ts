@@ -16,7 +16,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    if (typeof window !== 'undefined' && window.location && (window.location.port === '3000' || (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'))) {
       config.baseURL = window.location.origin;
     }
     const token = localStorage.getItem('access_token');

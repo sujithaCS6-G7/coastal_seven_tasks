@@ -3,8 +3,6 @@
 # Services: PostgreSQL, Redis, FastAPI Backend, Celery Worker, Celery Beat, Nginx Frontend
 # ==============================================================================
 
-version: "3.8"
-
 services:
   # ----------------------------------------------------------------------------
   # 1. PostgreSQL Relational Database Service
@@ -76,7 +74,7 @@ services:
       - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:80,http://127.0.0.1:80
     volumes:
       - chroma_data:/app/chroma_data
-      - uploads_data:/app/uploads
+      - ./backend/uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,8 +110,10 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - AI_ZERO_COST_MODE=true
     volumes:
-      - uploads_data:/app/uploads
+      - ./backend/uploads:/app/uploads
       - chroma_data:/app/chroma_data
+    healthcheck:
+      disable: true
     depends_on:
       backend:
         condition: service_healthy
@@ -133,7 +133,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: nexora-celery-beat
-    command: celery -A app.core.celery_app beat --loglevel=info
+    command: celery -A app.core.celery_app beat --loglevel=info -s /tmp/celerybeat-schedule
+    healthcheck:
+      disable: true
     env_file:
       - .env.docker
     environment:
@@ -162,7 +164,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/nginx-health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/nginx-health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3

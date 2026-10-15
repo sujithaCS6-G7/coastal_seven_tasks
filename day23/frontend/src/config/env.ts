@@ -5,9 +5,9 @@
 
 const rawApiUrl: string =
   (import.meta.env?.VITE_API_URL as string | undefined) ||
-  (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+  (typeof window !== 'undefined' && window.location && (window.location.port === '3000' || (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'))
     ? window.location.origin
-    : 'http://localhost:8005');
+    : 'http://localhost:8000');
 
 export const API_BASE_URL: string = rawApiUrl.replace(/\/+$/, '');
 
@@ -22,8 +22,10 @@ export const APP_NAME: string =
   'Nexora Day 21 AI Focus: Descriptions, Cache, Moderation & Agents';
 
 export function getApiBaseUrl(): string {
-  if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return window.location.origin;
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.port === '3000' || (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
+      return window.location.origin;
+    }
   }
   return API_BASE_URL;
 }
@@ -37,7 +39,7 @@ export function buildWsUrl(pathOrUrl: string): string {
     return pathOrUrl;
   }
   const normalizedPath = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
-  if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  if (typeof window !== 'undefined' && window.location && (window.location.port === '3000' || (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'))) {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}${normalizedPath}`;
   }
@@ -53,7 +55,7 @@ export function resolveAssetUrl(imageUrl?: string | null, fallbackUrl: string = 
     return imageUrl;
   }
   const normalizedPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-  if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  if (typeof window !== 'undefined' && window.location && (window.location.port === '3000' || (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'))) {
     return normalizedPath;
   }
   return `${API_BASE_URL}${normalizedPath}`;
