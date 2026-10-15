@@ -34,7 +34,7 @@ from app.utils.redis_client import redis_manager
 
 logger = logging.getLogger("nexora.ai.router")
 
-router = APIRouter(prefix="/ai", tags=["Day 22 AI Focus & RAG Studio"])
+router = APIRouter(prefix="/ai", tags=["AI Focus & Smart Copilot"])
 
 
 
@@ -333,7 +333,7 @@ def search_catalog_semantic_post(
 @router.post(
     "/moderate",
     response_model=ModerationResult,
-    summary="Screen User Text with Day 21 AI Content Moderation Guardrail",
+    summary="Screen User Text with AI Content Moderation Guardrail",
 )
 def moderate_user_content(request: Request, payload: ModerationRequest):
     """
@@ -349,7 +349,7 @@ def moderate_user_content(request: Request, payload: ModerationRequest):
 
 @router.get(
     "/agent/tools",
-    summary="List Approved Application Tools & JSON Schemas for the Day 21 AI Agent",
+    summary="List Approved Application Tools & JSON Schemas for the AI Shopping Agent",
 )
 def list_agent_tools():
     """Return the allowlisted application tools and their Pydantic parameter schemas."""
@@ -363,7 +363,7 @@ def list_agent_tools():
 @router.post(
     "/agent/execute",
     response_model=AgentExecuteResponse,
-    summary="Execute Day 21 Tool-Calling AI Shopping Agent (Moderated, Cached & Rate Limited)",
+    summary="Execute Tool-Calling AI Shopping Agent (Moderated, Cached & Rate Limited)",
 )
 async def execute_ai_agent(
     request: Request,
@@ -371,7 +371,7 @@ async def execute_ai_agent(
     db: Session = Depends(get_db),
 ):
     """
-    Runs the Day 21 AI Tool-Calling Agent:
+    Runs the Tool-Calling Shopping Agent:
     1. Per-user rate limit check.
     2. Input content moderation.
     3. Redis response cache check.
@@ -411,7 +411,7 @@ async def execute_ai_agent(
 
 @router.get(
     "/cache/stats",
-    summary="Inspect Day 21 Redis AI Response Cache Hit/Miss Telemetry",
+    summary="Inspect Redis AI Response Cache Hit/Miss Telemetry",
 )
 def get_ai_cache_stats():
     """Return current Redis AI response cache statistics, TTL, prefix, and hit rate."""
@@ -420,10 +420,10 @@ def get_ai_cache_stats():
 
 @router.delete(
     "/cache/clear",
-    summary="Invalidate All Day 21 AI Cached Responses in Redis",
+    summary="Invalidate All AI Cached Responses in Redis",
 )
 def clear_ai_cache():
-    """Clear all Day 21 AI response cache entries from Redis and fallback memory."""
+    """Clear all AI response cache entries from Redis and fallback memory."""
     return ai_cache_service.clear()
 
 
@@ -465,13 +465,13 @@ def reindex_products_catalog(request: Request, db: Session = Depends(get_db)):
 
 @router.get(
     "/status",
-    summary="Day 22 AI System Status (Providers, RAG, Redis Cache, Moderation, Per-User Limits, Tools & Cost Governance)",
+    summary="AI System Status (Providers, RAG, Redis Cache, Moderation, Per-User Limits, Tools & Cost Governance)",
 )
 def get_ai_status(request: Request):
     """
     Report active primary/fallback LLM providers, model names, ChromaDB vector counts,
     Redis AI cache metrics, content moderation stats, per-user rate limit config, agent tools,
-    and Day 22 Responsible AI & $0 Cost Governance summary.
+    and Responsible AI & $0 Cost Governance summary.
     Never exposes raw API keys or credentials.
     """
     rag_stats = rag_pipeline.get_stats()
@@ -523,13 +523,13 @@ def get_ai_status(request: Request):
 
 
 # ============================================================================
-# 9. Day 22 Responsible AI & $0 Cost Governance + Deployment Readiness
+# 9. Responsible AI & $0 Cost Governance + Deployment Readiness
 # ============================================================================
 
 
 @router.get(
     "/governance/status",
-    summary="Day 22 Responsible AI & $0 Cost Governance Telemetry",
+    summary="Responsible AI & $0 Cost Governance Telemetry",
 )
 def get_ai_cost_governance_status():
     """Return free-tier provider quota tracking, token usage, cache savings, and $0 API spend audit."""
@@ -538,7 +538,7 @@ def get_ai_cost_governance_status():
 
 @router.post(
     "/governance/reset",
-    summary="Reset Day 22 AI Cost Governance Counters",
+    summary="Reset AI Cost Governance Counters",
 )
 def reset_ai_cost_governance_status():
     """Reset AI cost & quota tracking counters for testing."""
@@ -551,7 +551,7 @@ def reset_ai_cost_governance_status():
 
 @router.get(
     "/deployment/readiness",
-    summary="Day 22 Free-Tier Cloud Deployment Readiness Check",
+    summary="Cloud Deployment Readiness Check",
 )
 def get_deployment_readiness(db: Session = Depends(get_db)):
     """Verify full-stack deployment readiness across PostgreSQL, Redis, ChromaDB, Celery, WebSockets, and Free-Tier AI."""

@@ -8,10 +8,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Central application settings for the Day 22 AI Focus Project."""
 
-    APP_NAME: str = (
-        "Nexora Day 22 AI Focus Project: RAG Assistant, Semantic Search, AI Descriptions, Live WebSocket Orders, Celery AI Workers & $0 Cost Governance"
-    )
-    VERSION: str = "22.0.0"
+    APP_NAME: str = "NexoraAI Production E-Commerce Store"
+    VERSION: str = "23.0.0"
     DEBUG: bool = True
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 

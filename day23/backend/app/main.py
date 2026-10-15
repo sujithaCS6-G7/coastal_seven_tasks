@@ -45,25 +45,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 tags_metadata = [
-    {"name": "System Status"},
-    {"name": "Day 21 AI Focus & RAG Studio"},
-    {"name": "Day 19 Security, Compression & Load Audit"},
-    {"name": "Authentication & Users"},
-    {"name": "Products & Catalog"},
-    {"name": "Redis Shopping Cart"},
-    {"name": "Orders & Checkout"},
-    {"name": "Background Tasks (Celery)"},
-    {"name": "WebSockets"},
+    {"name": "System & Health", "description": "Core system status, versioning and health check probes"},
+    {"name": "Security, Rate Limiting & Performance", "description": "OWASP API security, SlowAPI rate limiting, GZip compression and telemetry"},
+    {"name": "Authentication & Users", "description": "User registration, authentication and JWT bearer tokens"},
+    {"name": "Products & Catalog", "description": "Catalog management, PostgreSQL full-text/fuzzy search and image assets"},
+    {"name": "Redis Shopping Cart", "description": "High-speed in-memory shopping cart operations"},
+    {"name": "Orders & Checkout", "description": "Order placement, order history and admin management"},
+    {"name": "WebSockets", "description": "Real-time order tracking and customer support chat rooms"},
+    {"name": "Background Tasks (Celery & AI Workers)", "description": "Asynchronous PDF invoice generation, bulk CSV import and AI batch processing"},
+    {"name": "AI Focus & Smart Copilot", "description": "RAG streaming chat, semantic vector search, product descriptions, content guardrails and tool-calling agent"},
 ]
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     description=(
-        "Full-stack Day 21 AI Focus E-Commerce API featuring AI-Powered Product Descriptions, "
+        "Full-stack Production E-Commerce Architecture featuring AI-Powered Product Descriptions, "
         "ChromaDB Semantic Search with Metadata Filtering, AI Content Moderation Guardrails, "
-        "Redis AI Response Caching, Per-User JWT Rate Limiting, Safe Tool-Calling Agents, "
-        "and Multi-Provider Fallbacks (Gemini, Groq, Mistral, Local Contextual)."
+        "Redis AI Response Caching, Per-User JWT Rate Limiting, Safe Tool-Calling Shopping Copilot, "
+        "Celery Background Workers, and Multi-Provider LLM Fallbacks."
     ),
     openapi_tags=tags_metadata,
     docs_url="/docs",
@@ -238,17 +238,17 @@ def _read_lighthouse_summary() -> dict[str, Any]:
 
 @app.get(
     "/",
-    tags=["System Status"],
+    tags=["System & Health"],
     summary="Root Health Check",
 )
 @app.get(
     "/health",
-    tags=["System Status"],
+    tags=["System & Health"],
     summary="Service Health Check",
 )
 @app.get(
     "/api/v1/health",
-    tags=["System Status"],
+    tags=["System & Health"],
     summary="API v1 Health Check",
 )
 def root_health():
@@ -277,20 +277,20 @@ def root_health():
         "active_websockets": ws_order_manager.get_active_count(),
         "docs_url": "/docs",
         "features": [
-            "Day 21 AI-Powered Product Descriptions (Grounded & Redis Cached)",
-            "Day 21 Semantic Product Search with Metadata Filtering (Category, Price, Stock)",
-            "Day 21 AI Content Moderation Guardrail (Prompt Injection, Abuse & SQLi/XSS Screening)",
-            "Day 21 Redis AI Response Caching with Deterministic Keys & Configurable TTL",
-            "Day 21 Per-User JWT Rate Limiting (Independent User Quotas + Redis Backend)",
-            "Day 21 Safe Tool-Calling AI Agent (Allowlisted Tools & Validated Pydantic Schemas)",
-            "Day 20 AI Streaming Chat via Server-Sent Events (SSE)",
-            "Day 20 ChromaDB Vector Store & Semantic Product Catalog Search",
-            "Day 20 LangChain Prompt Chaining & Anti-Hallucination Guardrails",
-            "Day 20 Multi-Provider Fallback Hierarchy (Groq, Gemini, Mistral, Local)",
-            "Day 20 Real-Time Product Source Citations & Dynamic Context Injection",
-            "Day 19 SlowAPI Rate Limiting & Custom 429 Handler",
-            "Day 19 OWASP API Top 10 Security Headers & Payload Size Guard",
-            "Day 19 GZip Response Compression (GZipMiddleware >= 500B)",
+            "AI-Powered Product Descriptions (Grounded & Redis Cached)",
+            "Semantic Product Search with Metadata Filtering (Category, Price, Stock)",
+            "AI Content Moderation Guardrail (Prompt Injection, Abuse & SQLi/XSS Screening)",
+            "Redis AI Response Caching with Deterministic Keys & Configurable TTL",
+            "Per-User JWT Rate Limiting (Independent User Quotas + Redis Backend)",
+            "Safe Tool-Calling AI Agent (Allowlisted Tools & Validated Pydantic Schemas)",
+            "AI Streaming Chat via Server-Sent Events (SSE)",
+            "ChromaDB Vector Store & Semantic Product Catalog Search",
+            "LangChain Prompt Chaining & Anti-Hallucination Guardrails",
+            "Multi-Provider Fallback Hierarchy (Groq, Gemini, Mistral, Local)",
+            "Real-Time Product Source Citations & Dynamic Context Injection",
+            "SlowAPI Rate Limiting & Custom 429 Handler",
+            "OWASP API Top 10 Security Headers & Payload Size Guard",
+            "GZip Response Compression (GZipMiddleware >= 500B)",
             "Environment-Configured CORS & JWT Bearer Authentication",
             "Product CRUD & Pillow Image Processing",
             "Redis Fast Shopping Cart (24h TTL) & Catalog Cache-Aside",
@@ -306,12 +306,12 @@ def root_health():
 
 @app.get(
     "/system/security-status",
-    tags=["Day 19 Security, Compression & Load Audit"],
-    summary="Live Day 19 Security, GZip Compression, Bundle, Lighthouse & Locust Telemetry",
+    tags=["Security, Rate Limiting & Performance"],
+    summary="Live Security, GZip Compression, Bundle, Lighthouse & Locust Telemetry",
 )
 def get_security_and_performance_status(db: Session = Depends(get_db)):
     """
-    Return real-time Day 19 inspection data:
+    Return real-time production security and performance inspection data:
     - Active OWASP security headers and runtime protection counters
     - Active SlowAPI rate limits per endpoint
     - Live GZip compression ratio measured on the actual product catalog payload
@@ -369,7 +369,7 @@ def get_security_and_performance_status(db: Session = Depends(get_db)):
 
 @app.get(
     "/system/rate-limit-probe",
-    tags=["Day 19 Security, Compression & Load Audit"],
+    tags=["Security, Rate Limiting & Performance"],
     summary="Rate-Limited Probe Endpoint (5/minute) for Live SlowAPI 429 Verification",
 )
 @limiter.limit(settings.RATE_LIMIT_PROBE)
