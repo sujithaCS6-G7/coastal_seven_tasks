@@ -1,0 +1,47 @@
+{
+  "LaunchTemplateName": "lt-nexora-prod",
+  "VersionDescription": "v1.0.0 Production Launch Template with Docker and Auto-Restart",
+  "LaunchTemplateData": {
+    "ImageId": "ami-0c7217cdde317cfec",
+    "InstanceType": "t3.medium",
+    "KeyName": "nexora-ec2-keypair",
+    "IamInstanceProfile": {
+      "Arn": "arn:aws:iam::123456789012:instance-profile/NexoraEc2InstanceProfile"
+    },
+    "NetworkInterfaces": [
+      {
+        "AssociatePublicIpAddress": true,
+        "DeviceIndex": 0,
+        "Groups": [
+          "sg-nexora-prod"
+        ]
+      }
+    ],
+    "BlockDeviceMappings": [
+      {
+        "DeviceName": "/dev/sda1",
+        "Ebs": {
+          "VolumeSize": 30,
+          "VolumeType": "gp3",
+          "DeleteOnTermination": true,
+          "Encrypted": true,
+          "Iops": 3000,
+          "Throughput": 125
+        }
+      }
+    ],
+    "Monitoring": {
+      "Enabled": true
+    },
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          { "Key": "Environment", "Value": "Production" },
+          { "Key": "Project", "Value": "NexoraAI" },
+          { "Key": "Owner", "Value": "DevOpsTeam" }
+        ]
+      }
+    ]
+  }
+}

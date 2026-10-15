@@ -1,0 +1,36 @@
+# Git & IDE metadata
+.git
+.github
+.gitignore
+.vscode
+.idea
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+.packages/
+
+# Environment files & secrets (CRITICAL: Never bake secrets into image layers)
+.env
+.env.*
+!.env.example
+
+# Local ephemeral data and uploads
+chroma_data/
+uploads/
+*.log
+locust_*
+postman_collection.json
+run_backend.bat

@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.packages/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.vite/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Testing & Coverage
+.pytest_cache/
+test-results/
+coverage/
+.coverage
+.coverage.*
+htmlcov/
+playwright-report/
+
+# Secrets & Local Runtime Environments (keep .example & .docker)
+backend/.env
+frontend/.env
+*.local
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

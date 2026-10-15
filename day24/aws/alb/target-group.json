@@ -1,0 +1,27 @@
+{
+  "TargetGroupName": "tg-nexora-backend-prod",
+  "Protocol": "HTTP",
+  "Port": 8000,
+  "VpcId": "vpc-0123456789abcdef0",
+  "TargetType": "instance",
+  "HealthCheckProtocol": "HTTP",
+  "HealthCheckPort": "8000",
+  "HealthCheckPath": "/health/readiness",
+  "HealthCheckIntervalSeconds": 15,
+  "HealthCheckTimeoutSeconds": 5,
+  "HealthyThresholdCount": 2,
+  "UnhealthyThresholdCount": 3,
+  "Matcher": {
+    "HttpCode": "200"
+  },
+  "TargetGroupAttributes": [
+    {
+      "Key": "deregistration_delay.timeout_seconds",
+      "Value": "30"
+    },
+    {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+    }
+  ]
+}
