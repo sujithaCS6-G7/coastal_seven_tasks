@@ -1,0 +1,36 @@
+{
+  "monitors": [
+    {
+      "friendly_name": "NexoraAI Production API Liveness",
+      "url": "https://api.nexora.shop/health/liveness",
+      "type": 1,
+      "sub_type": 1,
+      "keyword_type": 1,
+      "keyword_value": "\"status\": \"alive\"",
+      "interval": 300,
+      "timeout": 30,
+      "http_method": 1,
+      "ssl_expiration_alert": {
+        "enabled": true,
+        "notify_days_before": 14
+      },
+      "alert_contacts": [
+        {
+          "type": 2,
+          "value": "devops-alerts@nexora.shop"
+        }
+      ]
+    },
+    {
+      "friendly_name": "NexoraAI Production Frontend (Vercel Edge)",
+      "url": "https://nexora.vercel.app",
+      "type": 1,
+      "interval": 300,
+      "timeout": 30,
+      "ssl_expiration_alert": {
+        "enabled": true,
+        "notify_days_before": 14
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "AutoScalingGroupName": "asg-nexora-backend-prod",
+  "LaunchTemplate": {
+    "LaunchTemplateName": "lt-nexora-prod",
+    "Version": "$Latest"
+  },
+  "MinSize": 2,
+  "MaxSize": 5,
+  "DesiredCapacity": 2,
+  "DefaultCooldown": 300,
+  "AvailabilityZones": [
+    "us-east-1a",
+    "us-east-1b"
+  ],
+  "TargetGroupARNs": [
+    "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-nexora-backend-prod/73e2d6bc24d8a067"
+  ],
+  "HealthCheckType": "ELB",
+  "HealthCheckGracePeriod": 300,
+  "ScalingPolicies": [
+    {
+      "PolicyName": "TargetTracking-CPUUtilization-70",
+      "PolicyType": "TargetTrackingScaling",
+      "TargetTrackingConfiguration": {
+        "PredefinedMetricSpecification": {
+          "PredefinedMetricType": "ASGAverageCPUUtilization"
+        },
+        "TargetValue": 70.0,
+        "DisableScaleIn": false
+      }
+    }
+  ],
+  "Tags": [
+    {
+      "Key": "Environment",
+      "Value": "Production",
+      "PropagateAtLaunch": true
+    },
+    {
+      "Key": "Application",
+      "Value": "NexoraBackend",
+      "PropagateAtLaunch": true
+    }
+  ]
+}

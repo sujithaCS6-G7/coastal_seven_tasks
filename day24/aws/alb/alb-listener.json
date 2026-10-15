@@ -1,0 +1,17 @@
+{
+  "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/alb-nexora-prod/50dc6c495c0c9188",
+  "Port": 443,
+  "Protocol": "HTTPS",
+  "SslPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+  "Certificates": [
+    {
+      "CertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+    }
+  ],
+  "DefaultActions": [
+    {
+      "Type": "forward",
+      "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-nexora-backend-prod/73e2d6bc24d8a067"
+    }
+  ]
+}

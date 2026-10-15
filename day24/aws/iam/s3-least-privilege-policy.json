@@ -1,0 +1,45 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowSpecificS3ObjectActionsOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::nexora-assets-prod/*"
+    },
+    {
+      "Sid": "AllowSpecificS3BucketListingOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::nexora-assets-prod",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "products/*",
+            "invoices/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyUnencryptedInTransitTraffic",
+      "Effect": "Deny",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::nexora-assets-prod",
+        "arn:aws:s3:::nexora-assets-prod/*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    }
+  ]
+}

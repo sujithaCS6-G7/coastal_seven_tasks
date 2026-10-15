@@ -1,0 +1,199 @@
+# ==============================================================================
+# Docker Compose Orchestration for NexoraAI Full-Stack Architecture
+# Services: PostgreSQL, Redis, FastAPI Backend, Celery Worker, Celery Beat, Nginx Frontend
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Relational Database Service
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexora-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-day10_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d day10_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nexora-net
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 2. Redis In-Memory Cache, Session & Celery Message Broker
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: nexora-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nexora-net
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 3. FastAPI Backend REST & WebSocket API Application
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexora-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.docker
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/day10_db
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - AI_ZERO_COST_MODE=true
+      - FRONTEND_ORIGIN=http://localhost:3000
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:80,http://127.0.0.1:80
+    volumes:
+      - chroma_data:/app/chroma_data
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - nexora-net
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 4. Celery Asynchronous Worker (AI batch descriptions, PDF invoices, CSV)
+  # ----------------------------------------------------------------------------
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexora-celery-worker
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - .env.docker
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/day10_db
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - AI_ZERO_COST_MODE=true
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - chroma_data:/app/chroma_data
+    healthcheck:
+      disable: true
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - nexora-net
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 5. Celery Beat Scheduler (Periodic inventory reconciliation, cache pruning)
+  # ----------------------------------------------------------------------------
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexora-celery-beat
+    command: celery -A app.core.celery_app beat --loglevel=info -s /tmp/celerybeat-schedule
+    healthcheck:
+      disable: true
+    env_file:
+      - .env.docker
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      celery_worker:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - nexora-net
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 6. React/Vite Frontend Nginx Production Static & Proxy Server
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexora-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - nexora-net
+    restart: unless-stopped
+
+# ==============================================================================
+# Persistent Named Volumes (Data persists across container stops and rebuilds)
+# ==============================================================================
+volumes:
+  postgres_data:
+    name: nexora_postgres_data
+    driver: local
+  redis_data:
+    name: nexora_redis_data
+    driver: local
+  chroma_data:
+    name: nexora_chroma_data
+    driver: local
+  uploads_data:
+    name: nexora_uploads_data
+    driver: local
+
+# ==============================================================================
+# Bridge Network (Enables container DNS resolution: backend, redis, postgres)
+# ==============================================================================
+networks:
+  nexora-net:
+    name: nexora-network
+    driver: bridge
