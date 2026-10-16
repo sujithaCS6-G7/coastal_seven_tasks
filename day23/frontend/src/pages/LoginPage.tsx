@@ -22,7 +22,7 @@ interface LocationState {
 }
 
 export const LoginPage: React.FC = () => {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -43,9 +43,13 @@ export const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(from, { replace: true });
+      if (user?.role === 'admin' && from === '/') {
+        navigate('/admin/orders', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, user, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
@@ -63,7 +67,11 @@ export const LoginPage: React.FC = () => {
         description: `Welcome back, ${loggedUser.username}!`,
         variant: 'success',
       });
-      navigate(from, { replace: true });
+      if (loggedUser.role === 'admin' && from === '/') {
+        navigate('/admin/orders', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err) {
       const msg = getErrorMessage(err);
       setError(msg);
