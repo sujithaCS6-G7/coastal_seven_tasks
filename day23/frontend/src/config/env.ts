@@ -7,9 +7,12 @@ const isTest = import.meta.env?.MODE === 'test';
 
 const rawApiUrl: string =
   (import.meta.env?.VITE_API_URL as string | undefined) ||
-  (!isTest && typeof window !== 'undefined' && window.location && (window.location.port === '3000' || (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'))
+  (!isTest &&
+  typeof window !== 'undefined' &&
+  window.location &&
+  window.location.port === '3000'
     ? window.location.origin
-    : 'http://localhost:8005');
+    : 'http://localhost:8000');
 
 export const API_BASE_URL: string = rawApiUrl.replace(/\/+$/, '');
 
@@ -21,11 +24,14 @@ export const WS_BASE_URL: string = rawWsUrl.replace(/\/+$/, '');
 
 export const APP_NAME: string =
   (import.meta.env?.VITE_APP_NAME as string | undefined) ||
-  'Nexora Day 21 AI Focus: Descriptions, Cache, Moderation & Agents';
+  'NexoraAI E-Commerce Store';
 
 export function getApiBaseUrl(): string {
+  if (import.meta.env?.VITE_API_URL) {
+    return (import.meta.env.VITE_API_URL as string).replace(/\/+$/, '');
+  }
   if (!isTest && typeof window !== 'undefined' && window.location) {
-    if (window.location.port === '3000' || (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
+    if (window.location.port === '3000') {
       return window.location.origin;
     }
   }
