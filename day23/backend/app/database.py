@@ -1,6 +1,8 @@
-"""Database configuration and session management for PostgreSQL day10_db."""
+"""Database configuration and session management for PostgreSQL & resilient SQLite fallback."""
 
 import logging
+from pathlib import Path
+import tempfile
 from typing import Generator
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -10,7 +12,9 @@ from app.models import Base, Product, User
 
 logger = logging.getLogger(__name__)
 
+
 def create_resilient_engine():
+    """Create database engine. If primary PostgreSQL is unreachable, fallback to local SQLite."""
     raw_url = settings.DATABASE_URL
     if raw_url.startswith("postgres://"):
         raw_url = raw_url.replace("postgres://", "postgresql+psycopg2://", 1)
@@ -33,9 +37,11 @@ def create_resilient_engine():
         logger.info(f"Connected to primary database: {raw_url.split('@')[-1] if '@' in raw_url else raw_url}")
         return eng
     except Exception as exc:
-        logger.warning(f"Primary database connection failed ({exc}). Falling back to local SQLite database.")
-        sqlite_url = "sqlite:///./ecommerce.db"
+        logger.warning(f"Primary database connection failed ({exc}). Falling back to local writable SQLite database.")
+        tmp_db = Path(tempfile.gettempdir()) / "nexora_ecommerce.db"
+        sqlite_url = f"sqlite:///{tmp_db.as_posix()}"
         return create_engine(sqlite_url, connect_args={"check_same_thread": False})
+
 
 engine = create_resilient_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -51,100 +57,104 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def check_db_connection() -> bool:
-    """Verify PostgreSQL server and day10_db availability."""
+    """Verify database connection health."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return True
     except Exception as exc:
-        logger.warning(f"PostgreSQL connection failed: {exc}")
+        logger.warning(f"Database health check failed: {exc}")
         return False
 
 
 def init_db():
-    """Create tables in day10_db, configure PostgreSQL FTS + pg_trgm GIN indexes, and seed catalog."""
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-            conn.execute(
-                text(
-                    "ALTER TABLE IF EXISTS products ADD COLUMN IF NOT EXISTS search_vector tsvector;"
+    """Create database tables, configure PostgreSQL FTS triggers if on Postgres, and seed initial catalog."""
+    is_postgres = "postgres" in engine.dialect.name.lower()
+
+    if is_postgres:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                conn.execute(
+                    text(
+                        "ALTER TABLE IF EXISTS products ADD COLUMN IF NOT EXISTS search_vector tsvector;"
+                    )
                 )
-            )
-    except Exception as exc:
-        logger.warning(f"PostgreSQL extension/search_vector initialization skipped or failed: {exc}")
+        except Exception as exc:
+            logger.warning(f"PostgreSQL extension/search_vector setup skipped: {exc}")
 
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as exc:
         logger.error(f"Base.metadata.create_all error: {exc}")
 
-    try:
-        # Configure PostgreSQL Full-Text Search trigger and GIN / Trigram indexes
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    """
-                    CREATE OR REPLACE FUNCTION products_search_vector_trigger() RETURNS trigger AS $$
-                    BEGIN
-                      NEW.search_vector :=
-                        setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
-                        setweight(to_tsvector('english', coalesce(NEW.category, '')), 'B') ||
-                        setweight(to_tsvector('english', coalesce(NEW.description, '')), 'C');
-                      RETURN NEW;
-                    END
-                    $$ LANGUAGE plpgsql;
-                    """
+    if is_postgres:
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        CREATE OR REPLACE FUNCTION products_search_vector_trigger() RETURNS trigger AS $$
+                        BEGIN
+                          NEW.search_vector :=
+                            setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
+                            setweight(to_tsvector('english', coalesce(NEW.category, '')), 'B') ||
+                            setweight(to_tsvector('english', coalesce(NEW.description, '')), 'C');
+                          RETURN NEW;
+                        END
+                        $$ LANGUAGE plpgsql;
+                        """
+                    )
                 )
-            )
-            conn.execute(
-                text("DROP TRIGGER IF EXISTS trg_products_search_vector ON products;")
-            )
-            conn.execute(
-                text(
-                    """
-                    CREATE TRIGGER trg_products_search_vector
-                    BEFORE INSERT OR UPDATE OF name, category, description
-                    ON products
-                    FOR EACH ROW
-                    EXECUTE FUNCTION products_search_vector_trigger();
-                    """
+                conn.execute(
+                    text("DROP TRIGGER IF EXISTS trg_products_search_vector ON products;")
                 )
-            )
-            conn.execute(
-                text(
-                    """
-                    UPDATE products SET search_vector =
-                      setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
-                      setweight(to_tsvector('english', coalesce(category, '')), 'B') ||
-                      setweight(to_tsvector('english', coalesce(description, '')), 'C')
-                    WHERE search_vector IS NULL;
-                    """
+                conn.execute(
+                    text(
+                        """
+                        CREATE TRIGGER trg_products_search_vector
+                        BEFORE INSERT OR UPDATE OF name, category, description
+                        ON products
+                        FOR EACH ROW
+                        EXECUTE FUNCTION products_search_vector_trigger();
+                        """
+                    )
                 )
-            )
-            conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS idx_products_search_vector_gin ON products USING GIN (search_vector);"
+                conn.execute(
+                    text(
+                        """
+                        UPDATE products SET search_vector =
+                          setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
+                          setweight(to_tsvector('english', coalesce(category, '')), 'B') ||
+                          setweight(to_tsvector('english', coalesce(description, '')), 'C')
+                        WHERE search_vector IS NULL;
+                        """
+                    )
                 )
-            )
-            conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS idx_products_name_trgm_gin ON products USING GIN (name gin_trgm_ops);"
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_products_search_vector_gin ON products USING GIN (search_vector);"
+                    )
                 )
-            )
-            conn.execute(
-                text(
-                    """
-                    CREATE INDEX IF NOT EXISTS idx_products_trgm_gin
-                    ON products USING GIN ((coalesce(name, '') || ' ' || coalesce(category, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
-                    """
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_products_name_trgm_gin ON products USING GIN (name gin_trgm_ops);"
+                    )
                 )
-            )
-        logger.info("PostgreSQL database 'day10_db' and FTS/pg_trgm GIN indexes initialized.")
-    except Exception as exc:
-        logger.warning(f"PostgreSQL triggers/GIN indexes initialization skipped: {exc}")
+                conn.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_products_trgm_gin
+                        ON products USING GIN ((coalesce(name, '') || ' ' || coalesce(category, '') || ' ' || coalesce(description, '')) gin_trgm_ops);
+                        """
+                    )
+                )
+            logger.info("PostgreSQL FTS & pg_trgm triggers/indexes configured successfully.")
+        except Exception as exc:
+            logger.warning(f"PostgreSQL triggers/GIN indexes initialization skipped: {exc}")
 
-        # Seed admin and sample products
+    # Seed admin, demo customers and sample products
+    try:
         from app.utils.security import hash_password
 
         with SessionLocal() as db:
@@ -161,7 +171,6 @@ def init_db():
                 db.commit()
                 logger.info("Default admin user created (admin / password123)")
 
-            # Seed 3 default demo customer accounts (customer1, customer2, customer3)
             demo_customers = [
                 ("customer1", "customer1@nexora.com"),
                 ("customer2", "customer2@nexora.com"),
@@ -181,71 +190,61 @@ def init_db():
                     )
             db.commit()
 
-            # Seed sample products if catalog is empty
+            # Seed sample catalog if empty
             product_count = db.query(Product).count()
             if product_count == 0:
                 sample_products = [
                     Product(
-                        name="Laptop Pro 15",
-                        description="High-performance laptop with 16GB RAM and 512GB SSD.",
-                        price=1299.99,
-                        stock=25,
-                        category="Electronics",
-                        image_url="/uploads/products/laptop.jpg",
+                        name="Apple MacBook Pro 16-inch M3 Pro",
+                        description="Flagship Apple Silicon laptop with 16-inch Liquid Retina XDR display, 36GB unified memory, and 22-hour battery life.",
+                        price=2499.00,
+                        stock=18,
+                        category="Laptops & Computers",
+                        image_url="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=60",
                     ),
                     Product(
-                        name="Wireless Noise-Cancelling Headphones",
-                        description="Premium over-ear headphones with 30-hour battery life.",
-                        price=199.99,
-                        stock=50,
-                        category="Audio",
-                        image_url="/uploads/products/headphones.jpg",
-                    ),
-                    Product(
-                        name="Mechanical Gaming Keyboard",
-                        description="RGB backlit mechanical keyboard with tactile blue switches.",
-                        price=89.99,
-                        stock=40,
-                        category="Accessories",
-                        image_url="/uploads/products/keyboard.jpg",
-                    ),
-                    Product(
-                        name="4K Ultra HD Monitor 27 inch",
-                        description="IPS panel 4K UHD monitor with HDR10 support.",
+                        name="Sony WH-1000XM5 Noise-Cancelling Headphones",
+                        description="Industry-leading noise cancelling studio headphones with Auto NC Optimizer, 30-hour battery life, and crystal-clear hands-free calling.",
                         price=349.99,
-                        stock=15,
-                        category="Displays",
-                        image_url="/uploads/products/monitor.jpg",
+                        stock=42,
+                        category="Audio & Headphones",
+                        image_url="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=60",
                     ),
                     Product(
-                        name="Ergonomic Wireless Mouse",
-                        description="Precision optical wireless mouse designed for ergonomics.",
-                        price=49.99,
-                        stock=80,
-                        category="Accessories",
-                        image_url="/uploads/products/mouse.jpg",
+                        name="Keychron Q1 Pro Wireless Mechanical Keyboard",
+                        description="Custom QMK/VIA wireless mechanical keyboard with CNC aluminum body, hot-swappable switches, and south-facing RGB backlighting.",
+                        price=199.00,
+                        stock=35,
+                        category="Gaming & Accessories",
+                        image_url="https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&auto=format&fit=crop&q=60",
+                    ),
+                    Product(
+                        name="Dell UltraSharp 32-inch 4K USB-C Hub Monitor",
+                        description="Premier 4K UHD color-accurate IPS Black monitor with 90W USB-C power delivery, RJ45 Ethernet, and factory color calibration.",
+                        price=799.00,
+                        stock=20,
+                        category="Displays & Monitors",
+                        image_url="https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&auto=format&fit=crop&q=60",
+                    ),
+                    Product(
+                        name="Apple iPhone 16 Pro Max 256GB Titanium",
+                        description="Flagship smartphone featuring Grade 5 Titanium design, A18 Pro chip, 48MP Fusion camera system with 5x telephoto, and Camera Control button.",
+                        price=1199.99,
+                        stock=30,
+                        category="Smartphones & Tablets",
+                        image_url="https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=800&auto=format&fit=crop&q=60",
+                    ),
+                    Product(
+                        name="Logitech MX Master 3S Wireless Performance Mouse",
+                        description="Ergonomic precision mouse with 8K DPI sensor, quiet click switches, MagSpeed electromagnetic scroll wheel, and USB-C quick charge.",
+                        price=99.99,
+                        stock=45,
+                        category="Gaming & Accessories",
+                        image_url="https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=800&auto=format&fit=crop&q=60",
                     ),
                 ]
                 db.add_all(sample_products)
                 db.commit()
                 logger.info("Sample e-commerce catalog seeded successfully.")
-
-            # Ensure iPhone 16 Pro Max exists for fuzzy/full-text search demos (e.g. 'iphon' -> 'iPhone 16 Pro Max')
-            iphone_exists = (
-                db.query(Product).filter(Product.name.ilike("%iPhone%")).first()
-            )
-            if not iphone_exists:
-                db.add(
-                    Product(
-                        name="iPhone 16 Pro Max",
-                        description="Flagship smartphone with A18 Pro chip, 5x Telephoto camera, and Titanium design.",
-                        price=1199.99,
-                        stock=30,
-                        category="Electronics",
-                        image_url="/uploads/products/laptop.jpg",
-                    )
-                )
-                db.commit()
     except Exception as exc:
-        logger.warning(f"Database init warning: {exc}")
-
+        logger.warning(f"Database seed warning: {exc}")
