@@ -230,6 +230,51 @@ class LLMManager:
             except httpx.ConnectError as exc:
                 raise LLMProviderError("openai_compatible", 503, f"Failed to connect: {exc}")
 
+    @staticmethod
+    def is_ecommerce_query(query: str, retrieved_items: list[dict[str, Any]]) -> tuple[bool, str]:
+        """Detect whether the user query is a relevant shopping/catalog request or off-topic."""
+        q = (query or "").lower().strip()
+        if not q:
+            return False, "empty"
+
+        # Greetings
+        greetings = ["hi", "hello", "hey", "good morning", "good evening", "good afternoon", "namaste", "how are you"]
+        if q in greetings or any(q == g for g in greetings):
+            return False, "greeting"
+
+        # Off-topic / general knowledge patterns
+        off_topic_patterns = [
+            "who is", "who are", "who was", "cm", "pm", "prime minister", "chief minister",
+            "president", "minister", "politics", "weather", "temperature", "capital of",
+            "tell me a joke", "sing a song", "recipe", "cricket", "football", "who created",
+            "what is your name", "who made you", "news", "election", "vote", "modi",
+            "biden", "trump", "revanth", "jagan", "chandrababu", "pawan", "kcr", "movie",
+            "hero", "actor", "actress", "song", "dance", "country", "state", "city"
+        ]
+
+        electronics_terms = [
+            "laptop", "phone", "headphone", "earphone", "monitor", "keyboard", "macbook",
+            "iphone", "sony", "dell", "bose", "samsung", "mouse", "price", "stock",
+            "buy", "order", "discount", "cart", "catalog", "camera", "battery", "display",
+            "screen", "charger", "audio", "sound", "gadget", "electronics"
+        ]
+
+        has_electronics = any(term in q for term in electronics_terms)
+        is_off_topic = any(p in q for p in off_topic_patterns)
+
+        if is_off_topic and not has_electronics:
+            return False, "off_topic"
+
+        # Check similarity relevance
+        if retrieved_items:
+            top_sim = float(retrieved_items[0].get("similarity_score", 0.0))
+            if top_sim < 0.60 and not has_electronics:
+                return False, "low_relevance"
+        else:
+            return False, "no_items"
+
+        return True, "valid"
+
     async def stream_local_contextual(
         self,
         query: str,
@@ -238,13 +283,31 @@ class LLMManager:
         """
         Deterministic, local fallback streamer.
         Grounded strictly on retrieved catalog items; answers accurately with exact citations
-        or states information is unavailable. Yields tokens with realistic typing intervals.
+        or politely declines off-topic / general knowledge questions. Yields tokens with realistic typing intervals.
         """
-        if not retrieved_items:
+        is_valid, reason = self.is_ecommerce_query(query, retrieved_items)
+
+        if not is_valid:
+            if reason == "greeting":
+                response_text = (
+                    "Hello! 👋 I am Nexora AI, your intelligent shopping copilot.\n\n"
+                    "I can help you search products, compare specs (like MacBook M3 vs Dell 4K), and verify live inventory. "
+                    "What electronics can I help you find today?"
+                )
+            else:
+                response_text = (
+                    f"I am Nexora's AI Shopping Assistant. I specialize exclusively in our store catalog, "
+                    f"electronics specifications, live inventory, and customer orders.\n\n"
+                    f"I cannot answer general knowledge, political, or off-topic questions like \"{query}\".\n\n"
+                    f"💡 **Try asking me about:**\n"
+                    f"• *\"Compare MacBook Air vs Dell 4K Monitor\"*\n"
+                    f"• *\"Show me noise cancelling headphones\"*\n"
+                    f"• *\"Which smartphones are in stock?\"*"
+                )
+        elif not retrieved_items:
             response_text = (
-                "I cannot find that product or specification in our catalog. "
-                "Currently available items are listed in our store catalog and search results. "
-                "Please let me know if you would like recommendations for other categories!"
+                "I could not find matching products in our catalog for that request. "
+                "Please browse our store catalog or try searching for laptops, headphones, monitors, or smartphones!"
             )
         else:
             # Construct grounded, factual response

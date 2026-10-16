@@ -148,11 +148,10 @@ class FallbackHandler:
         trace.provider_used = chosen_provider
 
         # 1. Emit metadata event first with product citations and provider diagnostics
-        metadata_payload = {
-            "provider_used": trace.provider_used,
-            "fallback_triggered": trace.fallback_triggered,
-            "attempts": trace.fallback_chain_executed,
-            "citations": [
+        is_valid, _ = LLMManager.is_ecommerce_query(query, retrieved_items)
+        citations_list = []
+        if is_valid:
+            citations_list = [
                 {
                     "product_id": item["product_id"],
                     "name": item["name"],
@@ -162,7 +161,13 @@ class FallbackHandler:
                     "similarity_score": item.get("similarity_score", 0.0),
                 }
                 for item in retrieved_items
-            ],
+            ]
+
+        metadata_payload = {
+            "provider_used": trace.provider_used,
+            "fallback_triggered": trace.fallback_triggered,
+            "attempts": trace.fallback_chain_executed,
+            "citations": citations_list,
         }
         yield {"event": "metadata", "data": metadata_payload}
 
