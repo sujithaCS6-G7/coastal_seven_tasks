@@ -76,6 +76,22 @@ export const AdminOrdersPage = () => {
     };
   }, [orders]);
 
+  // Memoized Customer Breakdown (which customer placed how many orders)
+  const customerBreakdown = useMemo(() => {
+    const map = new Map();
+    orders.forEach((o) => {
+      const uname = o.user?.username || `User #${o.user_id}`;
+      const email = o.user?.email || 'N/A';
+      if (!map.has(uname)) {
+        map.set(uname, { username: uname, email, count: 0, totalSpent: 0 });
+      }
+      const entry = map.get(uname);
+      entry.count += 1;
+      entry.totalSpent += Number(o.total_amount || 0);
+    });
+    return Array.from(map.values());
+  }, [orders]);
+
   // Memoized Filtered orders
   const filteredOrders = useMemo(() => {
     if (statusFilter === 'ALL') return orders;
@@ -177,6 +193,47 @@ export const AdminOrdersPage = () => {
           <span className="text-[10px] text-muted-foreground mt-0.5 block">Completed shipments</span>
         </Card>
       </div>
+
+      {/* Customer Purchase Activity Breakdown */}
+      {customerBreakdown.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between pb-3 border-b border-border/60">
+            <span className="text-xs font-bold text-foreground flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              <span>Customer Order Activity ({customerBreakdown.length} Customers)</span>
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              Total: <strong>{metrics.totalOrders}</strong> Orders placed
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+            {customerBreakdown.map((cust) => (
+              <div
+                key={cust.username}
+                className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-muted/20"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs uppercase">
+                    {cust.username.slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-foreground">{cust.username}</p>
+                    <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">{cust.email}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline" className="text-[11px] font-bold border-indigo-500/30 text-indigo-600 dark:text-indigo-400">
+                    {cust.count} {cust.count === 1 ? 'Order' : 'Orders'}
+                  </Badge>
+                  <p className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                    ₹{cust.totalSpent.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="mt-8 flex flex-wrap items-center gap-2 pb-4">

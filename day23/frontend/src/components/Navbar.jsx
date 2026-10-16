@@ -125,14 +125,25 @@ const NavbarBase = () => {
             )}
             {isAuthenticated && (
               <>
-                <li>
-                  <NavLink to="/orders" className={navLinkClass}>
-                    <span className="flex items-center gap-1.5">
-                      <ClipboardList className="h-4 w-4 text-primary" />
-                      <span>My Orders</span>
-                    </span>
-                  </NavLink>
-                </li>
+                {user?.role === 'admin' ? (
+                  <li>
+                    <NavLink to="/admin/orders" className={navLinkClass}>
+                      <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
+                        <ClipboardList className="h-4 w-4" />
+                        <span>Customer Orders</span>
+                      </span>
+                    </NavLink>
+                  </li>
+                ) : (
+                  <li>
+                    <NavLink to="/orders" className={navLinkClass}>
+                      <span className="flex items-center gap-1.5">
+                        <ClipboardList className="h-4 w-4 text-primary" />
+                        <span>My Orders</span>
+                      </span>
+                    </NavLink>
+                  </li>
+                )}
                 <li>
                   <NavLink to="/profile" className={navLinkClass}>
                     <span className="flex items-center gap-1.5">
@@ -141,17 +152,17 @@ const NavbarBase = () => {
                     </span>
                   </NavLink>
                 </li>
+                {user?.role === 'admin' && (
+                  <li>
+                    <NavLink to="/admin" className={navLinkClass}>
+                      <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
+                        <Shield className="h-4 w-4" />
+                        <span>Admin Dashboard</span>
+                      </span>
+                    </NavLink>
+                  </li>
+                )}
               </>
-            )}
-            {isAuthenticated && user?.role === 'admin' && (
-              <li>
-                <NavLink to="/admin" className={navLinkClass}>
-                  <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
-                    <Shield className="h-4 w-4" />
-                    <span>Admin Dashboard</span>
-                  </span>
-                </NavLink>
-              </li>
             )}
           </ul>
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useMyOrdersQuery, useOrderDetailQuery } from '../hooks/useOrders';
 import { useRealtime } from '../context/RealtimeContext';
 import { getErrorMessage } from '../api/axiosClient';
@@ -21,6 +22,8 @@ import {
   AlertCircle,
   Wifi,
   WifiOff,
+  Shield,
+  ClipboardList,
 } from 'lucide-react';
 import { OrderInvoiceGenerator } from '../components/BackgroundJobsPanel';
 import type { OrderOut } from '../types/api';
@@ -38,6 +41,7 @@ const ORDER_STATUS_FILTERS = [
 
 export const OrderHistoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const { isConnected, wsStatus } = useRealtime();
@@ -85,6 +89,33 @@ export const OrderHistoryPage: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-colors">
+      {user?.role === 'admin' && (
+        <div className="mb-6 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/15 via-purple-500/10 to-indigo-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shrink-0">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <span>Administrator Mode: Looking for Customer Orders?</span>
+                <Badge className="bg-indigo-600 text-white text-[10px]">Admin</Badge>
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                "My Orders" shows your personal purchases. To inspect customer orders, view itemized receipts, and update shipping/delivery statuses, open the Customer Orders portal.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => navigate('/admin/orders')}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 shrink-0"
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            <span>Manage Customer Orders</span>
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
