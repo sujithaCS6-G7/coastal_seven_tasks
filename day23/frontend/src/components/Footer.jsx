@@ -4,14 +4,17 @@ import { API_BASE_URL } from '../config/env';
 
 const getBackendPort = () => {
   try {
-    return new URL(API_BASE_URL).port || '8003';
+    const url = new URL(API_BASE_URL);
+    if (url.port) return `:${url.port}`;
+    if (url.protocol === 'https:') return 'Render Cloud';
+    return ':8000';
   } catch {
-    return '8003';
+    return 'Cloud';
   }
 };
 
 const FooterBase = () => {
-  const backendPort = getBackendPort();
+  const backendLabel = getBackendPort();
   return (
     <footer className="w-full border-t border-border bg-card py-6 text-center text-xs text-muted-foreground transition-colors mt-auto">
       <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -20,7 +23,7 @@ const FooterBase = () => {
         </p>
         <div className="flex items-center gap-2 text-[11px]">
           <span className="flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400">
-            <ShieldCheck className="h-3.5 w-3.5" /> FastAPI (:{backendPort}) Connected
+            <ShieldCheck className="h-3.5 w-3.5" /> FastAPI ({backendLabel}) Connected
           </span>
           <span>&bull;</span>
           <span>ChromaDB + Redis + Guardrails Active</span>

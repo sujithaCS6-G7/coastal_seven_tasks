@@ -10,12 +10,34 @@ from app.models import Base, Product, User
 
 logger = logging.getLogger(__name__)
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    echo=False,
-)
+def create_resilient_engine():
+    raw_url = settings.DATABASE_URL
+    if raw_url.startswith("postgres://"):
+        raw_url = raw_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+"):
+        raw_url = raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
+    connect_args = {}
+    if "sqlite" in raw_url:
+        connect_args["check_same_thread"] = False
+
+    try:
+        eng = create_engine(
+            raw_url,
+            pool_pre_ping=True,
+            echo=False,
+            connect_args=connect_args,
+        )
+        with eng.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info(f"Connected to primary database: {raw_url.split('@')[-1] if '@' in raw_url else raw_url}")
+        return eng
+    except Exception as exc:
+        logger.warning(f"Primary database connection failed ({exc}). Falling back to local SQLite database.")
+        sqlite_url = "sqlite:///./ecommerce.db"
+        return create_engine(sqlite_url, connect_args={"check_same_thread": False})
+
+engine = create_resilient_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -49,9 +71,15 @@ def init_db():
                     "ALTER TABLE IF EXISTS products ADD COLUMN IF NOT EXISTS search_vector tsvector;"
                 )
             )
+    except Exception as exc:
+        logger.warning(f"PostgreSQL extension/search_vector initialization skipped or failed: {exc}")
 
+    try:
         Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.error(f"Base.metadata.create_all error: {exc}")
 
+    try:
         # Configure PostgreSQL Full-Text Search trigger and GIN / Trigram indexes
         with engine.begin() as conn:
             conn.execute(
@@ -112,8 +140,9 @@ def init_db():
                     """
                 )
             )
-
         logger.info("PostgreSQL database 'day10_db' and FTS/pg_trgm GIN indexes initialized.")
+    except Exception as exc:
+        logger.warning(f"PostgreSQL triggers/GIN indexes initialization skipped: {exc}")
 
         # Seed admin and sample products
         from app.utils.security import hash_password

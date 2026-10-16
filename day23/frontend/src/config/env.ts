@@ -10,9 +10,12 @@ const rawApiUrl: string =
   (!isTest &&
   typeof window !== 'undefined' &&
   window.location &&
-  window.location.port === '3000'
-    ? window.location.origin
-    : 'http://localhost:8000');
+  (window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1')
+    ? window.location.port === '3000'
+      ? window.location.origin
+      : 'http://localhost:8000'
+    : 'https://nexora-backend-b0fh.onrender.com');
 
 export const API_BASE_URL: string = rawApiUrl.replace(/\/+$/, '');
 
